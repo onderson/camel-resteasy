@@ -1,4 +1,26 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.camel.component.resteasy.test;
+
+import java.io.File;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.camel.CamelContext;
 import org.apache.camel.Exchange;
@@ -11,11 +33,14 @@ import org.apache.camel.component.resteasy.test.beans.Customer;
 import org.apache.camel.component.resteasy.test.beans.CustomerList;
 import org.apache.camel.component.resteasy.test.beans.CustomerService;
 import org.apache.camel.component.resteasy.test.beans.ProxyProducerInterface;
+import org.apache.camel.component.resteasy.test.beans.ResteasyProducerProxyTestApp;
 import org.apache.camel.spi.DataFormat;
 import org.apache.camel.test.junit4.CamelTestSupport;
 import org.jboss.arquillian.container.test.api.Deployment;
 import org.jboss.arquillian.junit.Arquillian;
 import org.jboss.arquillian.junit.InSequence;
+import org.jboss.arquillian.test.api.ArquillianResource;
+import org.jboss.shrinkwrap.api.Archive;
 import org.jboss.shrinkwrap.api.ShrinkWrap;
 import org.jboss.shrinkwrap.api.spec.WebArchive;
 import org.jboss.shrinkwrap.resolver.api.maven.Maven;
@@ -23,38 +48,32 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-
-/**
- * @author : Roman Jakubco | rjakubco@redhat.com.
- */
 @RunWith(Arquillian.class)
-public class ResteasyProducerProxyTest extends CamelTestSupport {
-    final static String URI = "http://localhost:8080" ;
+public class ResteasyProducerProxyTest
+
+extends CamelTestSupport 
+
+{   
+	@ArquillianResource
+	URI baseUri;
+
     @Deployment
-    public static WebArchive createDeployment() {
+    public static Archive<?> createTestArchive() {
 
         return ShrinkWrap.create(WebArchive.class, "test.war")
-                .addAsWebInfResource(new File("src/test/resources/webWithoutAppContext.xml"), "web.xml")
-                .addClasses(CustomerService.class, Customer.class, CustomerList.class, ProxyProducerInterface.class)
+        		.addClasses(Customer.class, CustomerService.class, CustomerList.class, ProxyProducerInterface.class, ResteasyProducerProxyTestApp.class)
                 .addPackage("org.apache.camel.component.resteasy")
                 .addPackage("org.apache.camel.component.resteasy.servlet")
-                .addAsLibraries(Maven.resolver().loadPomFromFile("src/test/resources/pom.xml").importRuntimeAndTestDependencies().resolve()
+                .addAsLibraries(Maven.resolver().loadPomFromFile("pom.xml").importRuntimeAndTestDependencies().resolve()
                         .withTransitivity().asFile())
-                .addAsLibraries(Maven.resolver().resolve("org.apache.camel:camel-http:2.14.0").withTransitivity().asFile())
-                .addAsLibraries(Maven.resolver().resolve("org.apache.camel:camel-test:2.14.0").withTransitivity().asFile())
-                .addAsLibraries(Maven.resolver().resolve("org.apache.camel:camel-jackson:2.14.0").withTransitivity().asFile())
-                .addAsLibraries(Maven.resolver().resolve("org.apache.commons:commons-lang3:3.3.2").withTransitivity().asFile());
+                .addAsWebInfResource(new File("src/test/resources/webWithoutAppContext2.xml"), "web.xml");
     }
-
+    
     @Override
     protected RouteBuilder createRouteBuilder() {
         return new RouteBuilder() {
             public void configure() {
-                ResteasyComponent resteasy = new ResteasyComponent();
+            	ResteasyComponent resteasy = new ResteasyComponent();
                 CamelContext camelContext = getContext();
                 camelContext.addComponent("resteasy", resteasy);
 
@@ -62,37 +81,35 @@ public class ResteasyProducerProxyTest extends CamelTestSupport {
                 DataFormat dataFormat = new JacksonDataFormat(Customer.class);
 
 
-                from("direct:getAll").to("resteasy:" + URI + "?proxyClientClass=org.apache.camel.component.resteasy.test.beans.ProxyProducerInterface" +
+                from("direct:getAll").to("resteasy:" + baseUri.toString() + "?proxyClientClass=org.apache.camel.component.resteasy.test.beans.ProxyProducerInterface" +
                         "&proxyMethod=getAllCustomers");
 
-                from("direct:get").to("resteasy:" + URI + "?proxyClientClass=org.apache.camel.component.resteasy.test.beans.ProxyProducerInterface" +
+                from("direct:get").to("resteasy:" + baseUri.toString() + "?proxyClientClass=org.apache.camel.component.resteasy.test.beans.ProxyProducerInterface" +
                         "&proxyMethod=getCustomer");
 
-                from("direct:getUnmarshal").to("resteasy:" + URI + "?proxyClientClass=org.apache.camel.component.resteasy.test.beans.ProxyProducerInterface" +
+                from("direct:getUnmarshal").to("resteasy:" + baseUri.toString() + "?proxyClientClass=org.apache.camel.component.resteasy.test.beans.ProxyProducerInterface" +
                         "&proxyMethod=getCustomer").unmarshal(dataFormat);
 
-                from("direct:post").to("resteasy:" + URI + "?proxyClientClass=org.apache.camel.component.resteasy.test.beans.ProxyProducerInterface" +
+                from("direct:post").to("resteasy:" + baseUri.toString() + "?proxyClientClass=org.apache.camel.component.resteasy.test.beans.ProxyProducerInterface" +
                         "&proxyMethod=createCustomer");
 
-                from("direct:put").marshal(dataFormat).to("resteasy:" + URI + "?proxyClientClass=org.apache.camel.component.resteasy.test.beans.ProxyProducerInterface" +
+                from("direct:put").marshal(dataFormat).to("resteasy:" + baseUri.toString() + "?proxyClientClass=org.apache.camel.component.resteasy.test.beans.ProxyProducerInterface" +
                         "&proxyMethod=updateCustomer");
 
-                from("direct:delete").to("resteasy:" + URI + "?proxyClientClass=org.apache.camel.component.resteasy.test.beans.ProxyProducerInterface" +
+                from("direct:delete").to("resteasy:" + baseUri.toString() + "?proxyClientClass=org.apache.camel.component.resteasy.test.beans.ProxyProducerInterface" +
                         "&proxyMethod=deleteCustomer");
 
-                from("direct:moreAttributes").to("resteasy:" + URI + "?proxyClientClass=org.apache.camel.component.resteasy.test.beans.ProxyProducerInterface" +
+                from("direct:moreAttributes").to("resteasy:" + baseUri.toString() + "?proxyClientClass=org.apache.camel.component.resteasy.test.beans.ProxyProducerInterface" +
                         "&proxyMethod=getSpecificThreeCustomers");
-                from("direct:differentType").to("resteasy:" + URI + "?proxyClientClass=org.apache.camel.component.resteasy.test.beans.ProxyProducerInterface" +
+                from("direct:differentType").to("resteasy:" + baseUri.toString() + "?proxyClientClass=org.apache.camel.component.resteasy.test.beans.ProxyProducerInterface" +
                         "&proxyMethod=checkIfCustomerExists");
 
-                from("direct:notResponseType").to("resteasy:" + URI + "?proxyClientClass=org.apache.camel.component.resteasy.test.beans.ProxyProducerInterface" +
+                from("direct:notResponseType").to("resteasy:" + baseUri.toString() + "?proxyClientClass=org.apache.camel.component.resteasy.test.beans.ProxyProducerInterface" +
                         "&proxyMethod=getCustomerWithoutResponse");
-
-
             }
         };
     }
-
+    
     private void deleteCustomer(Integer id){
         Map<String, Object> headers = new HashMap<>();
         ArrayList<Object> params = new ArrayList<Object>();
@@ -130,14 +147,13 @@ public class ResteasyProducerProxyTest extends CamelTestSupport {
                 exchange.getIn().getHeaders().put(ResteasyConstants.RESTEASY_PROXY_METHOD_PARAMS, params);
             }
         });
-        Assert.assertEquals(expectedBody, response.getOut().getBody(String.class));
+        Assert.assertEquals(expectedBody, response.getMessage().getBody(String.class));
     }
 
 
     @Test
     public void testProxyGetUnmarshal() throws Exception {
-        final Integer customerId = 2;
-        Customer expectedCustomer = new Customer("Camel", "Rider", customerId);
+        Customer expectedCustomer = new Customer("Camel", "Rider", 2);
 
         Exchange response = template.request("direct:getUnmarshal", new Processor() {
             @Override
@@ -148,7 +164,7 @@ public class ResteasyProducerProxyTest extends CamelTestSupport {
                 exchange.getIn().getHeaders().put(ResteasyConstants.RESTEASY_PROXY_METHOD_PARAMS, params);
             }
         });
-        Assert.assertEquals(expectedCustomer, response.getOut().getBody(Customer.class));
+        Assert.assertEquals(expectedCustomer, response.getMessage().getBody(Customer.class));
 
     }
 
@@ -317,8 +333,8 @@ public class ResteasyProducerProxyTest extends CamelTestSupport {
             }
         });
 
-        Assert.assertTrue(exchange.getOut().getBody() instanceof NoSuchMethodException);
-        Assert.assertTrue(exchange.getOut().getHeaders().containsKey(ResteasyConstants.RESTEASY_PROXY_PRODUCER_EXCEPTION));
+        Assert.assertTrue(exchange.getMessage().getBody() instanceof NoSuchMethodException);
+        Assert.assertTrue(exchange.getMessage().getHeaders().containsKey(ResteasyConstants.RESTEASY_PROXY_PRODUCER_EXCEPTION));
 
         deleteCustomer(customerId);
     }

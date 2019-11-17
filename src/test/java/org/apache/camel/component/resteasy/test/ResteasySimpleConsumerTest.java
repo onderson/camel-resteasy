@@ -1,12 +1,36 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.camel.component.resteasy.test;
+
+import java.io.File;
+import java.net.URI;
+import java.nio.file.Files;
+
+import javax.ws.rs.client.Client;
+import javax.ws.rs.client.ClientBuilder;
+import javax.ws.rs.client.WebTarget;
+import javax.ws.rs.core.Response;
 
 import org.apache.camel.component.resteasy.test.beans.SimpleService;
 import org.apache.camel.component.resteasy.test.beans.TestBean;
 import org.jboss.arquillian.container.test.api.Deployment;
 import org.jboss.arquillian.junit.Arquillian;
-import org.jboss.resteasy.client.jaxrs.ResteasyClient;
-import org.jboss.resteasy.client.jaxrs.ResteasyClientBuilder;
-import org.jboss.resteasy.client.jaxrs.ResteasyWebTarget;
+import org.jboss.arquillian.test.api.ArquillianResource;
+import org.jboss.shrinkwrap.api.Archive;
 import org.jboss.shrinkwrap.api.ShrinkWrap;
 import org.jboss.shrinkwrap.api.spec.WebArchive;
 import org.jboss.shrinkwrap.resolver.api.maven.Maven;
@@ -14,35 +38,29 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import javax.ws.rs.core.Response;
-import java.io.File;
-import java.nio.file.Files;
-
-/**
- * @author : Roman Jakubco | rjakubco@redhat.com
- */
 @RunWith(Arquillian.class)
 public class ResteasySimpleConsumerTest {
-    private final static String URI = "http://localhost:8080/test/";
-
+    
+	@ArquillianResource
+	URI baseUri;
+    
     @Deployment
-    public static WebArchive createDeployment() {
+    public static Archive<?> createTestArchive() {
 
         return ShrinkWrap.create(WebArchive.class, "test.war")
-                .addAsResource(new File("src/test/resources/contexts/simpleConsumer.xml"), "applicationContext.xml")
-                .addAsWebInfResource(new File("src/test/resources/web.xml"))
-                .addClasses(SimpleService.class, TestBean.class)
                 .addPackage("org.apache.camel.component.resteasy")
                 .addPackage("org.apache.camel.component.resteasy.servlet")
-                .addAsLibraries(Maven.resolver().loadPomFromFile("src/test/resources/pom.xml").importRuntimeAndTestDependencies().resolve()
-                        .withTransitivity().asFile());
-//                .addAsLibraries(Maven.resolver().resolve("org.apache.camel:camel-http:2.16-SNAPSHOT").withTransitivity().asFile());
+                .addClasses(SimpleService.class, TestBean.class)
+                .addAsLibraries(Maven.resolver().loadPomFromFile("pom.xml").importRuntimeAndTestDependencies().resolve()
+                        .withTransitivity().asFile())
+                .addAsWebInfResource(new File("src/test/resources/contexts/simpleConsumer.xml"), "applicationContext.xml")
+                .addAsWebInfResource("web.xml");
     }
 
     @Test
     public void testGettingResponseFromBean() throws Exception {
-        ResteasyClient client = new ResteasyClientBuilder().build();
-        ResteasyWebTarget target = client.target(URI + "simpleService/getMsg");
+        Client client = ClientBuilder.newBuilder().build();
+        WebTarget target = client.target(baseUri.toString() + "simpleService/getMsg");
         Response response = target.request().get();
 
         Assert.assertEquals(200, response.getStatus());
@@ -51,8 +69,8 @@ public class ResteasySimpleConsumerTest {
 
     @Test
     public void testGettingBodyFromCamelRoute() throws Exception {
-        ResteasyClient client = new ResteasyClientBuilder().build();
-        ResteasyWebTarget target = client.target(URI + "simpleService/getMsg2");
+        Client client = ClientBuilder.newBuilder().build();
+        WebTarget target = client.target(baseUri.toString() + "simpleService/getMsg2");
         Response response = target.request().get();
 
         Assert.assertEquals(200, response.getStatus());
@@ -63,8 +81,8 @@ public class ResteasySimpleConsumerTest {
     public void testGettingResponseFromRestService() throws Exception {
         String expectedResponse = "Message3 from Rest service";
 
-        ResteasyClient client = new ResteasyClientBuilder().build();
-        ResteasyWebTarget target = client.target(URI + "simpleService/getMsg3");
+        Client client = ClientBuilder.newBuilder().build();
+        WebTarget target = client.target(baseUri.toString() + "simpleService/getMsg3");
         Response response = target.request().get();
 
         Assert.assertEquals(200, response.getStatus());

@@ -1,29 +1,44 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.camel.component.resteasy;
+
+import java.net.URI;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 
 import org.apache.camel.CamelContext;
 import org.apache.camel.Consumer;
 import org.apache.camel.Endpoint;
 import org.apache.camel.Processor;
-import org.apache.camel.component.http.AuthMethod;
 import org.apache.camel.component.http.HttpClientConfigurer;
 import org.apache.camel.component.http.HttpComponent;
-import org.apache.camel.component.http.HttpConsumer;
+import org.apache.camel.http.common.HttpConsumer;
 import org.apache.camel.spi.HeaderFilterStrategy;
 import org.apache.camel.spi.RestConfiguration;
 import org.apache.camel.spi.RestConsumerFactory;
 import org.apache.camel.util.FileUtil;
 import org.apache.camel.util.URISupport;
 import org.apache.camel.util.UnsafeUriCharactersEncoder;
-import org.apache.commons.httpclient.params.HttpClientParams;
 import org.jboss.resteasy.plugins.server.servlet.HttpServletDispatcher;
-
-import java.net.URI;
-import java.util.*;
 
 /**
  * Defines a Resteasy component, which is extending HttpComponent
  *
- * @author : Roman Jakubco | rjakubco@redhat.com
  */
 public class ResteasyComponent extends HttpComponent implements RestConsumerFactory {
 
@@ -46,11 +61,9 @@ public class ResteasyComponent extends HttpComponent implements RestConsumerFact
 
     @Override
     protected Endpoint createEndpoint(String uri, String remaining, Map<String, Object> parameters) throws Exception {
-        HttpClientParams params = new HttpClientParams();
-
         // create the configurer to use for this endpoint
-        final Set<AuthMethod> authMethods = new LinkedHashSet<AuthMethod>();
-        HttpClientConfigurer configurer = createHttpClientConfigurer(parameters, authMethods);
+        // TODO second parameter might be false or true, based on security level
+        HttpClientConfigurer configurer = createHttpClientConfigurer(parameters, false);
 
         // must extract well known parameters before we create the endpoint
         Boolean throwExceptionOnFailure = getAndRemoveParameter(parameters, "throwExceptionOnFailure", Boolean.class);
@@ -63,7 +76,7 @@ public class ResteasyComponent extends HttpComponent implements RestConsumerFact
         // restructure uri to be based on the parameters left as we don't want to include the Camel internal options
         URI httpUri = URISupport.createRemainingURI(new URI(UnsafeUriCharactersEncoder.encodeHttpURI(uri)), parameters);
 
-        ResteasyEndpoint endpoint =  new ResteasyEndpoint(uri, this, httpUri, params, getHttpConnectionManager(), configurer);
+        ResteasyEndpoint endpoint =  new ResteasyEndpoint(uri, this, httpUri, getClientConnectionManager(), configurer);
 
         // Needed for taking component options from URI and using only clean uri for resource. Later adding query parameters
         setProperties(endpoint, parameters);
@@ -114,7 +127,47 @@ public class ResteasyComponent extends HttpComponent implements RestConsumerFact
     }
 
     @Override
-    public Consumer createConsumer(CamelContext camelContext, Processor processor, String verb, String basePath, String uriTemplate, String consumes, String produces, Map<String, Object> parameters) throws Exception {
+    public void connect(HttpConsumer consumer) throws Exception {
+        ResteasyConsumer sc = (ResteasyConsumer) consumer;
+        String name = sc.getEndpoint().getServletName();
+        HttpRegistry registry = httpRegistry;
+        if (registry == null) {
+            registry = DefaultHttpRegistry.getHttpRegistry(name);
+        }
+        registry.register(consumer);
+    }
+
+    @Override
+    public void disconnect(HttpConsumer consumer) throws Exception {
+        ResteasyConsumer sc = (ResteasyConsumer) consumer;
+        String name = sc.getEndpoint().getServletName();
+        HttpRegistry registry = httpRegistry;
+        if (registry == null) {
+            registry = DefaultHttpRegistry.getHttpRegistry(name);
+        }
+        registry.unregister(consumer);
+    }
+
+    public String getProxyConsumersClasses() {
+        return proxyConsumersClasses;
+    }
+
+    public void setProxyConsumersClasses(String proxyConsumersClasses) {
+        this.proxyConsumersClasses = proxyConsumersClasses;
+    }
+
+    public HttpRegistry getHttpRegistry() {
+        return httpRegistry;
+    }
+
+    public void setHttpRegistry(HttpRegistry httpRegistry) {
+        this.httpRegistry = httpRegistry;
+    }
+
+	@Override
+	public Consumer createConsumer(CamelContext camelContext, Processor processor, String verb, String basePath,
+			String uriTemplate, String consumes, String produces, RestConfiguration configuration,
+			Map<String, Object> parameters) throws Exception {
 
         String path = basePath;
         if (uriTemplate != null) {
@@ -164,44 +217,6 @@ public class ResteasyComponent extends HttpComponent implements RestConsumerFact
 
 
         return consumer;
-    }
-
-    @Override
-    public void connect(HttpConsumer consumer) throws Exception {
-        ResteasyConsumer sc = (ResteasyConsumer) consumer;
-        String name = sc.getEndpoint().getServletName();
-        HttpRegistry registry = httpRegistry;
-        if (registry == null) {
-            registry = DefaultHttpRegistry.getHttpRegistry(name);
-        }
-        registry.register(consumer);
-    }
-
-    @Override
-    public void disconnect(HttpConsumer consumer) throws Exception {
-        ResteasyConsumer sc = (ResteasyConsumer) consumer;
-        String name = sc.getEndpoint().getServletName();
-        HttpRegistry registry = httpRegistry;
-        if (registry == null) {
-            registry = DefaultHttpRegistry.getHttpRegistry(name);
-        }
-        registry.unregister(consumer);
-    }
-
-    public String getProxyConsumersClasses() {
-        return proxyConsumersClasses;
-    }
-
-    public void setProxyConsumersClasses(String proxyConsumersClasses) {
-        this.proxyConsumersClasses = proxyConsumersClasses;
-    }
-
-    public HttpRegistry getHttpRegistry() {
-        return httpRegistry;
-    }
-
-    public void setHttpRegistry(HttpRegistry httpRegistry) {
-        this.httpRegistry = httpRegistry;
-    }
+	}
 
 }

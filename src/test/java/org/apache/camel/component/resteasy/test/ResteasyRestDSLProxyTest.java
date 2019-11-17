@@ -1,13 +1,35 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.camel.component.resteasy.test;
 
+import java.io.File;
+import java.net.URI;
+
+import javax.ws.rs.client.Client;
+import javax.ws.rs.client.ClientBuilder;
+import javax.ws.rs.client.WebTarget;
+import javax.ws.rs.core.Response;
 
 import org.apache.camel.component.resteasy.test.beans.Customer;
 import org.apache.camel.component.resteasy.test.beans.ProxyServiceInterface;
 import org.jboss.arquillian.container.test.api.Deployment;
 import org.jboss.arquillian.junit.Arquillian;
-import org.jboss.resteasy.client.jaxrs.ResteasyClient;
-import org.jboss.resteasy.client.jaxrs.ResteasyClientBuilder;
-import org.jboss.resteasy.client.jaxrs.ResteasyWebTarget;
+import org.jboss.arquillian.test.api.ArquillianResource;
+import org.jboss.shrinkwrap.api.Archive;
 import org.jboss.shrinkwrap.api.ShrinkWrap;
 import org.jboss.shrinkwrap.api.spec.WebArchive;
 import org.jboss.shrinkwrap.resolver.api.maven.Maven;
@@ -15,40 +37,34 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import javax.ws.rs.core.Response;
-import java.io.File;
-
-/**
- * @author : Roman Jakubco | rjakubco@redhat.com on 09/03/15.
- */
 @RunWith(Arquillian.class)
 public class ResteasyRestDSLProxyTest {
-    private final static String URI = "http://localhost:8080/test/";
-    @Deployment
-    public static WebArchive createDeployment() {
+	@ArquillianResource
+	URI baseUri;
 
-        return ShrinkWrap.create(WebArchive.class, "test.war")
-                .addAsResource(new File("src/test/resources/contexts/restDSLProxy.xml"), "applicationContext.xml")
-                .addAsWebInfResource(new File("src/test/resources/web.xml"))
-                .addClasses(ProxyServiceInterface.class, Customer.class)
-                .addPackage("org.apache.camel.component.resteasy")
-                .addPackage("org.apache.camel.component.resteasy.servlet")
-                .addAsLibraries(Maven.resolver().loadPomFromFile("src/test/resources/pom.xml").importRuntimeAndTestDependencies().resolve()
-                        .withTransitivity().asFile())
-                .addAsLibraries(Maven.resolver().resolve("org.apache.camel:camel-http:2.14.0").withTransitivity().asFile());
-    }
+	@Deployment
+	public static Archive<?> createTestArchive() {
+		
+		WebArchive war = ShrinkWrap.create(WebArchive.class, "test.war")
+				.addClasses(ProxyServiceInterface.class, Customer.class)
+				.addPackage("org.apache.camel.component.resteasy")
+				.addPackage("org.apache.camel.component.resteasy.servlet")
+				.addAsLibraries(Maven.resolver().loadPomFromFile("pom.xml").importRuntimeAndTestDependencies().resolve()
+						.withTransitivity().asFile())
+				.addAsWebInfResource(new File("src/test/resources/contexts/restDSLProxy.xml"),
+						"applicationContext.xml")
+				.addAsWebInfResource("web.xml");
+		return war;
+	}
 
+	@Test
+	public void testRestDSLProxy() throws Exception {
+		Client client = ClientBuilder.newBuilder().build();
+		WebTarget target = client.target(baseUri.toString() + "proxy/get");
+		Response response = target.request().get();
 
+		Assert.assertEquals(200, response.getStatus());
+		Assert.assertEquals("Address from ProxyInterface", response.readEntity(String.class));
 
-
-    @Test
-    public void testRestDSLProxy() throws Exception {
-        ResteasyClient client = new ResteasyClientBuilder().build();
-        ResteasyWebTarget target = client.target(URI + "proxy/get");
-        Response response = target.request().get();
-
-        Assert.assertEquals(200, response.getStatus());
-        Assert.assertEquals("Address from ProxyInterface", response.readEntity(String.class));
-
-    }
+	}
 }

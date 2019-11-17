@@ -1,5 +1,28 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.camel.component.resteasy.test;
 
+import java.io.File;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.ws.rs.core.MediaType;
 
 import org.apache.camel.CamelContext;
 import org.apache.camel.CamelExecutionException;
@@ -17,6 +40,8 @@ import org.apache.camel.spi.DataFormat;
 import org.apache.camel.test.junit4.CamelTestSupport;
 import org.jboss.arquillian.container.test.api.Deployment;
 import org.jboss.arquillian.junit.Arquillian;
+import org.jboss.arquillian.test.api.ArquillianResource;
+import org.jboss.shrinkwrap.api.Archive;
 import org.jboss.shrinkwrap.api.ShrinkWrap;
 import org.jboss.shrinkwrap.api.spec.WebArchive;
 import org.jboss.shrinkwrap.resolver.api.maven.Maven;
@@ -24,36 +49,25 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import javax.ws.rs.core.MediaType;
-import java.io.File;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-
-/**
- * @author : Roman Jakubco | rjakubco@redhat.com
- */
 @RunWith(Arquillian.class)
 public class ResteasyProducerTest  extends CamelTestSupport{
-    final static String URI = "http://localhost:8080/test/customer/" ;
+	
+	@ArquillianResource
+	URI baseUri;
 
     @Deployment
-    public static WebArchive createDeployment() {
+    public static Archive<?> createTestArchive() {
 
         return ShrinkWrap.create(WebArchive.class, "test.war")
-//                .addAsResource(new File("src/test/resources/contexts/basicProducer.xml"), "applicationContext.xml")
-                .addAsWebInfResource(new File("src/test/resources/webWithoutAppContext.xml"), "web.xml")
-                .addClasses(Customer.class, TestBean.class, CustomerService.class, CustomerList.class)
                 .addPackage("org.apache.camel.component.resteasy")
                 .addPackage("org.apache.camel.component.resteasy.servlet")
-                .addAsLibraries(Maven.resolver().loadPomFromFile("src/test/resources/pom.xml").importRuntimeAndTestDependencies().resolve()
+                .addClasses(Customer.class, TestBean.class, CustomerService.class, CustomerList.class)
+                .addAsLibraries(Maven.resolver().loadPomFromFile("pom.xml").importRuntimeAndTestDependencies().resolve()
                         .withTransitivity().asFile())
-                .addAsLibraries(Maven.resolver().resolve("org.apache.camel:camel-http:2.14.0").withTransitivity().asFile())
-                .addAsLibraries(Maven.resolver().resolve("org.apache.camel:camel-test:2.14.0").withTransitivity().asFile())
-                .addAsLibraries(Maven.resolver().resolve("org.apache.camel:camel-jackson:2.14.0").withTransitivity().asFile());
+                .addAsWebInfResource(new File("src/test/resources/webWithoutAppContext.xml"), "web.xml");
     }
 
-
+    @Override
     protected RouteBuilder createRouteBuilder() {
         return new RouteBuilder() {
             public void configure() {
@@ -64,29 +78,29 @@ public class ResteasyProducerTest  extends CamelTestSupport{
                 DataFormat dataFormat = new JacksonDataFormat(Customer.class);
 
 
-                from("direct:getAll").to("resteasy:" + URI + "getAll?resteasyMethod=GET");
+                from("direct:getAll").to("resteasy:" + baseUri.toString() + "customer/getAll?resteasyMethod=GET");
 
-                from("direct:get").to("resteasy:" + URI + "getCustomer?resteasyMethod=GET");
+                from("direct:get").to("resteasy:" + baseUri.toString() + "customer/getCustomer?resteasyMethod=GET");
 
-                from("direct:getUnmarshal").to("resteasy:" + URI + "getCustomer?resteasyMethod=GET").unmarshal(dataFormat);
+                from("direct:getUnmarshal").to("resteasy:" + baseUri.toString() + "customer/getCustomer?resteasyMethod=GET").unmarshal(dataFormat);
 
-                from("direct:post").to("resteasy:" + URI + "createCustomer?resteasyMethod=POST");
+                from("direct:post").to("resteasy:" + baseUri.toString() + "customer/createCustomer?resteasyMethod=POST");
 
-                from("direct:postInHeader").marshal(dataFormat).to("resteasy:" + URI + "createCustomer");
+                from("direct:postInHeader").marshal(dataFormat).to("resteasy:" + baseUri.toString() + "customer/createCustomer");
 
-                from("direct:postMarshal").marshal(dataFormat).to("resteasy:" + URI + "createCustomer?resteasyMethod=POST");
+                from("direct:postMarshal").marshal(dataFormat).to("resteasy:" + baseUri.toString() + "customer/createCustomer?resteasyMethod=POST");
 
-                from("direct:put").marshal(dataFormat).to("resteasy:" + URI + "updateCustomer?resteasyMethod=PUT");
+                from("direct:put").marshal(dataFormat).to("resteasy:" + baseUri.toString() + "customer/updateCustomer?resteasyMethod=PUT");
 
-                from("direct:delete").to("resteasy:" + URI + "deleteCustomer?resteasyMethod=DELETE");
+                from("direct:delete").to("resteasy:" + baseUri.toString() + "customer/deleteCustomer?resteasyMethod=DELETE");
 
-                from("direct:queryHeader").to("resteasy:"  + URI + "getAll?resteasyMethod=GET");
+                from("direct:queryHeader").to("resteasy:"  + baseUri.toString() + "customer/getAll?resteasyMethod=GET");
 
-                from("direct:methodHeader").to("resteasy:" + URI + "getAll?resteasyMethod=GET");
+                from("direct:methodHeader").to("resteasy:" + baseUri.toString() + "customer/getAll?resteasyMethod=GET");
 
-                from("direct:wrongMethod").to("resteasy:"  + URI + "getAll?resteasyMethod=GET");
+                from("direct:wrongMethod").to("resteasy:"  + baseUri.toString() + "customer/getAll?resteasyMethod=GET");
 
-                from("direct:notExisting").to("resteasy:" + URI + "getAll?resteasyMethod=GET");
+                from("direct:notExisting").to("resteasy:" + baseUri.toString() + "customer/getAll?resteasyMethod=GET");
             }
         };
     }
@@ -202,7 +216,7 @@ public class ResteasyProducerTest  extends CamelTestSupport{
             }
         });
 
-        Assert.assertEquals(405, exchange.getOut().getHeaders().get("CamelHttpResponseCode"));
+        Assert.assertEquals(405, exchange.getMessage().getHeaders().get("CamelHttpResponseCode"));
 
         Map<String, Object> headers = new HashMap<>();
 
@@ -225,23 +239,24 @@ public class ResteasyProducerTest  extends CamelTestSupport{
     }
 
 
-    @Test
+    @SuppressWarnings("rawtypes")
+	@Test
     public void testHead() throws Exception {
         Exchange exchange =  template.request("direct:getAll", new Processor() {
             @Override
             public void process(Exchange exchange) throws Exception {
-                exchange.getOut().setHeader(ResteasyConstants.RESTEASY_HTTP_METHOD, "HEAD");
+                exchange.getMessage().setHeader(ResteasyConstants.RESTEASY_HTTP_METHOD, "HEAD");
             }
         });
 
-        Map<String, Object> headers =  exchange.getOut().getHeaders();
+        Map<String, Object> headers =  exchange.getMessage().getHeaders();
         ArrayList contentType = (ArrayList) headers.get("Content-Type");
-        ArrayList server = (ArrayList) headers.get("Server");
+        //ArrayList server = (ArrayList) headers.get("Server");
         ArrayList contentLength = (ArrayList) headers.get("Content-Length");
         Integer responseCode = (Integer) headers.get("CamelHttpResponseCode");
 
         Assert.assertEquals("application/json", contentType.get(0));
-        Assert.assertEquals("WildFly/8", server.get(0));
+        //Assert.assertEquals("WildFly/8", server.get(0));
         Assert.assertEquals("87", contentLength.get(0));
         Assert.assertEquals(new Integer(200), responseCode);
     }

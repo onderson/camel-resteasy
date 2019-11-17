@@ -1,20 +1,32 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.camel.component.resteasy.servlet;
 
 import org.apache.camel.Exchange;
 import org.apache.camel.ExchangePattern;
-import org.apache.camel.component.http.HttpConsumer;
-import org.apache.camel.component.http.HttpMessage;
-import org.apache.camel.component.http.helper.HttpHelper;
 import org.apache.camel.component.resteasy.*;
-import org.apache.camel.impl.DefaultExchange;
+import org.apache.camel.http.common.HttpConsumer;
+import org.apache.camel.http.common.HttpHelper;
+import org.apache.camel.http.common.HttpMessage;
+import org.apache.camel.support.DefaultExchange;
 import org.jboss.resteasy.plugins.server.servlet.HttpServletDispatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
@@ -24,14 +36,20 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import javax.servlet.ServletConfig;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
 /**
  * Class extending HttpServletDispatcher from Resteasy and representing servlet used as Camel Consumer. This servlet
  * needs to be used in application if you want to use Camel Resteasy consumer in your camel routes.
- *
- * @author : Roman Jakubco | rjakubco@redhat.com
  */
 public class ResteasyCamelServlet extends HttpServletDispatcher {
-    private HttpRegistry httpRegistry;
+
+	private static final long serialVersionUID = 1L;
+
+	private HttpRegistry httpRegistry;
 
     private String servletName;
 
@@ -47,7 +65,8 @@ public class ResteasyCamelServlet extends HttpServletDispatcher {
      * @param servletConfig configuration of the servlet
      * @throws ServletException exception thrown from the super method
      */
-    @Override
+    @SuppressWarnings("rawtypes")
+	@Override
     public void init(ServletConfig servletConfig) throws ServletException {
         super.init(servletConfig);
 
@@ -182,7 +201,7 @@ public class ResteasyCamelServlet extends HttpServletDispatcher {
 
             // Proxy is set to true
             HttpHelper.setCharsetFromContentType(httpServletRequest.getContentType(), exchange);
-            HttpMessage m = new HttpMessage(exchange, httpServletRequest, httpServletResponse);
+            HttpMessage m = new HttpMessage(exchange, consumer.getEndpoint(), httpServletRequest, httpServletResponse);
 
             m.setBody(((ResteasyHttpServletRequestWrapper) httpServletRequest).getStream());
             exchange.setIn(m);
@@ -193,7 +212,7 @@ public class ResteasyCamelServlet extends HttpServletDispatcher {
             }
 
             HttpHelper.setCharsetFromContentType(httpServletRequest.getContentType(), exchange);
-            HttpMessage m = new HttpMessage(exchange, httpServletRequest, httpServletResponse);
+            HttpMessage m = new HttpMessage(exchange, consumer.getEndpoint(), httpServletRequest, httpServletResponse);
 
             response = new String(((ResteasyHttpServletResponseWrapper) httpServletResponse).getCopy(), httpServletResponse.getCharacterEncoding());
 

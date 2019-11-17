@@ -1,35 +1,48 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.camel.component.resteasy.test.beans;
 
-import org.apache.camel.Exchange;
-import org.apache.camel.component.resteasy.ResteasyConstants;
-import org.apache.camel.component.resteasy.ResteasyHttpBinding;
-import org.apache.camel.spi.HeaderFilterStrategy;
-import org.apache.camel.util.MessageHelper;
-import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.jboss.resteasy.client.jaxrs.BasicAuthentication;
-import org.jboss.resteasy.client.jaxrs.ResteasyClient;
-import org.jboss.resteasy.client.jaxrs.ResteasyClientBuilder;
-import org.jboss.resteasy.client.jaxrs.ResteasyWebTarget;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.ws.rs.client.Entity;
-import javax.ws.rs.client.Invocation;
-import javax.ws.rs.core.Response;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Created by roman on 25/04/15.
- */
+import javax.ws.rs.client.Client;
+import javax.ws.rs.client.ClientBuilder;
+import javax.ws.rs.client.Entity;
+import javax.ws.rs.client.Invocation;
+import javax.ws.rs.client.WebTarget;
+import javax.ws.rs.core.Response;
+
+import org.apache.camel.Exchange;
+import org.apache.camel.component.resteasy.ResteasyConstants;
+import org.apache.camel.component.resteasy.ResteasyHttpBinding;
+import org.apache.camel.spi.HeaderFilterStrategy;
+import org.apache.camel.support.MessageHelper;
+import org.apache.camel.util.ObjectHelper;
+import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.jboss.resteasy.client.jaxrs.ResteasyWebTarget;
+import org.jboss.resteasy.client.jaxrs.internal.BasicAuthentication;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The default Resteasy binding implementation
- *
- * @author : Roman Jakubco | rjakubco@redhat.com
  */
 public class TestHttpBinding implements ResteasyHttpBinding {
 
@@ -48,14 +61,14 @@ public class TestHttpBinding implements ResteasyHttpBinding {
 
     @Override
     public Response populateResteasyRequestFromExchangeAndExecute(String uri, Exchange exchange, Map<String, String> parameters) {
-        ResteasyClient client = new ResteasyClientBuilder().build();
+        Client client = ClientBuilder.newBuilder().build();
         String body = exchange.getIn().getBody(String.class);
 
         LOG.debug("Body in producer: " + body);
 
         String mediaType = exchange.getIn().getHeader(Exchange.CONTENT_TYPE, String.class);
 
-        ResteasyWebTarget target = client.target(uri);
+        WebTarget target = client.target(uri);
 
         LOG.debug("Populate Resteasy request from exchange body: {} using media type {}", body, mediaType);
 
@@ -110,11 +123,12 @@ public class TestHttpBinding implements ResteasyHttpBinding {
     }
 
 
-    @Override
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+	@Override
     public void populateProxyResteasyRequestAndExecute(String uri, Exchange exchange, Map<String, String> parameters){
-        ResteasyClient client = new ResteasyClientBuilder().build();
+        Client client = ClientBuilder.newBuilder().build();
 
-        ResteasyWebTarget target = client.target(uri);
+        WebTarget target = client.target(uri);
 
         if(parameters.get("username") != null && parameters.get("password") != null){
             target.register(new BasicAuthentication(parameters.get("username"), parameters.get("password")));
@@ -128,7 +142,7 @@ public class TestHttpBinding implements ResteasyHttpBinding {
         Object object = null;
         try {
             realClazz = Class.forName(parameters.get("proxyClassName"));
-            Object simple = target.proxy(realClazz);
+            Object simple = ObjectHelper.cast(ResteasyWebTarget.class, target).proxy(realClazz);
 
             ArrayList headerParams = exchange.getIn().getHeader(ResteasyConstants.RESTEASY_PROXY_METHOD_PARAMS, ArrayList.class);
 
@@ -154,16 +168,16 @@ public class TestHttpBinding implements ResteasyHttpBinding {
                 populateExchangeFromResteasyResponse(exchange, (Response) object);
                 ((Response) object).close();
             } else {
-                exchange.getOut().setBody(object);
+                exchange.getMessage().setBody(object);
                 // preserve headers from in by copying any non existing headers
                 // to avoid overriding existing headers with old values
-                MessageHelper.copyHeaders(exchange.getIn(), exchange.getOut(), false);
+                MessageHelper.copyHeaders(exchange.getIn(), exchange.getMessage(), false);
             }
 
 
         } catch (ClassNotFoundException | InvocationTargetException | NoSuchMethodException | IllegalAccessException e) {
-            exchange.getOut().getHeaders().put(ResteasyConstants.RESTEASY_PROXY_PRODUCER_EXCEPTION, ExceptionUtils.getStackTrace(e));
-            exchange.getOut().setBody(e);
+            exchange.getMessage().getHeaders().put(ResteasyConstants.RESTEASY_PROXY_PRODUCER_EXCEPTION, ExceptionUtils.getStackTrace(e));
+            exchange.getMessage().setBody(e);
             LOG.error("Camel RESTEasy proxy exception", e);
         }
     }
@@ -186,21 +200,21 @@ public class TestHttpBinding implements ResteasyHttpBinding {
 
         // set resteasy response as header so the end user has access to it if needed
         headers.put(ResteasyConstants.RESTEASY_RESPONSE, response);
-        exchange.getOut().setHeaders(headers);
+        exchange.getMessage().setHeaders(headers);
 
         LOG.debug("Headers from exchange.getIn() : " + exchange.getIn().getHeaders().toString());
-        LOG.debug("Headers from exchange.getOut() before copying : " + exchange.getOut().getHeaders().toString());
+        LOG.debug("Headers from exchange.getOut() before copying : " + exchange.getMessage().getHeaders().toString());
         LOG.debug("Header from response : " + response.getHeaders().toString());
 
         if(response.hasEntity()){
-            exchange.getOut().setBody("Test from custom HttpBinding");
+            exchange.getMessage().setBody("Test from custom HttpBinding");
         } else{
-            exchange.getOut().setBody("Test from custom HttpBinding");
+            exchange.getMessage().setBody("Test from custom HttpBinding");
         }
 
         // preserve headers from in by copying any non existing headers
         // to avoid overriding existing headers with old values
-        MessageHelper.copyHeaders(exchange.getIn(), exchange.getOut(), false);
+        MessageHelper.copyHeaders(exchange.getIn(), exchange.getMessage(), false);
     }
 
 

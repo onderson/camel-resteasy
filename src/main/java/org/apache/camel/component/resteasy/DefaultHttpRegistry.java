@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -16,8 +16,8 @@
  */
 package org.apache.camel.component.resteasy;
 
-import org.apache.camel.component.http.HttpConsumer;
 import org.apache.camel.component.resteasy.servlet.ResteasyCamelServlet;
+import org.apache.camel.http.common.HttpConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,8 +28,6 @@ import java.util.Set;
 
 /**
  * The default implementation of HttpRegistry interface
- *
- * @author : Roman Jakubco | rjakubco@redhat.com
  */
 public class DefaultHttpRegistry implements HttpRegistry {
     private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpRegistry.class);

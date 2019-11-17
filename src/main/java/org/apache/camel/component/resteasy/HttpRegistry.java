@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -16,14 +16,13 @@
  */
 package org.apache.camel.component.resteasy;
 
-import org.apache.camel.component.http.HttpConsumer;
 import org.apache.camel.component.resteasy.servlet.ResteasyCamelServlet;
+import org.apache.camel.http.common.HttpConsumer;
 
 /**
  * Keeps track of HttpConsumers and ResteasyServlets and
  * connects them to each other.
  *
- * @author : Roman Jakubco | rjakubco@redhat.com
  */
 public interface HttpRegistry {
 
